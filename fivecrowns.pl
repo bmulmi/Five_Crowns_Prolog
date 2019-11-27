@@ -24,7 +24,7 @@ getGameFromFile(Game):-
     open(FullPath, read, File),
     read(File, State),
     close(File),
-    Game=State,
+    Game = State,
     write("Game loaded "), write(FullPath), nl, nl.
 
 getGameFromFile(Game) :-
@@ -33,8 +33,8 @@ getGameFromFile(Game) :-
 
 newGame(_):-
     coinToss(NextPlayer),
+    playGame(1, [], 0, [], 0, NextPlayer).
     
-
 coinToss(NextPlayer):-
     random_between(0, 1, R),
     nl, write("Heads (1) or Tails (0): "),
@@ -49,6 +49,33 @@ coinToss(NextPlayer):-
 
 loadGame(Game):- 
     displayRoundStatus(Game).
+
+playGame(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer):-
+    checkIfRoundEnded(RoundNum, HumanHand, HumanScore, CompHand, CompScore).
+
+playGame(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer):- 
+    generateNewRound(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, GameState),
+    loadGame(GameState).
+
+generateNewRound(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, GameState):-
+    UnshuffledDeck = ['j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk',
+                        'j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk'],
+    random_permutation(UnshuffledDeck, Deck),
+    NumCards is RoundNum + 2,
+    distributeHand(NumCards, HumanHand, Deck, NewDeck),
+    distributeHand(NumCards, CompHand, NewDeck, NewNewDeck),
+    [Top | ] = NewNewDeck,
+    discardToPile(Top, DiscardPile, NewDiscardPile),
+    %GameState = 
+
+distributeHand(0, OldDeck, [], NewDeck):- OldDeck = NewDeck.
+
+distributeHand(NumCards, [DeckFirst|DeckRest], Hand, NewDeck):-
+    NewNumCards is NumCards - 1,
+    distributeHand(NewNumCards, DeckRest, NewHand, NewDeck),
+    [DeckFirst | NewHand] = Hand.
+
+discardToPile(Card, DiscardPile, NewDiscardPile):- [Card | DiscardPile] = NewDiscardPile.
 
 displayRoundStatus(State):-
     getRoundNumber(State, RoundNumber),
