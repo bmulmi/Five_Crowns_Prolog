@@ -49,9 +49,7 @@ coinToss(NextPlayer):-
 
 loadGame(Game):- 
     displayRoundStatus(Game).
-
-playGame(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer):-
-    checkIfRoundEnded(RoundNum, HumanHand, HumanScore, CompHand, CompScore).
+    
 
 playGame(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer):- 
     generateNewRound(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, GameState),
@@ -61,21 +59,39 @@ generateNewRound(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlaye
     UnshuffledDeck = ['j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk',
                         'j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk'],
     random_permutation(UnshuffledDeck, Deck),
-    NumCards is RoundNum + 2,
-    distributeHand(NumCards, HumanHand, Deck, NewDeck),
-    distributeHand(NumCards, CompHand, NewDeck, NewNewDeck),
-    [Top | ] = NewNewDeck,
-    discardToPile(Top, DiscardPile, NewDiscardPile),
-    %GameState = 
+    Num is RoundNum + 2,
+    distributeHand(Num, Deck, NHumanHand, NewDeck),
+    distributeHand(Num, NewDeck, NCompHand, NewNewDeck),
+    popTopCard(NewNewDeck, DrawPile, Top),
+    discardToPile(Top, [], DiscardPile),
+    GameState = [RoundNum, CompScore, NCompHand, HumanScore, NHumanHand, DrawPile, DiscardPile, NextPlayer].
 
-distributeHand(0, OldDeck, [], NewDeck):- OldDeck = NewDeck.
+distributeHand(0, OldDeck, [], NewDeck):- 
+    NewDeck = OldDeck.
 
-distributeHand(NumCards, [DeckFirst|DeckRest], Hand, NewDeck):-
+distributeHand(NumCards, [DeckFirst|DeckRest], Hand, RemainingDeck):-
     NewNumCards is NumCards - 1,
     distributeHand(NewNumCards, DeckRest, NewHand, NewDeck),
-    [DeckFirst | NewHand] = Hand.
+    [DeckFirst | NewHand] = Hand,
+    NewDeck = RemainingDeck.
 
-discardToPile(Card, DiscardPile, NewDiscardPile):- [Card | DiscardPile] = NewDiscardPile.
+popTopCard(From, Returning, Card):-
+    [Top | Rest] = From,
+    Card = Top,
+    Returning = Rest.
+
+distributeCards(0, CardsToDistribute, [], CardsAfterDistribution):- CardsAfterDistribution = CardsToDistribute.
+
+distributeCards(Num, CardsToDistribute, Hand, CardsAfterDistribution):-
+    write(Num),nl,
+    NewNum is Num - 1,
+    [H | T] = CardsToDistribute,
+    distributeCards(NewNum, T, NewHand, NewCardsDistribution),
+    [H | NewHand] = Hand,
+    NewCardsDistribution = CardsAfterDistribution.
+
+discardToPile(Card, DiscardPile, NewDiscardPile):- 
+    [Card | DiscardPile] = NewDiscardPile.
 
 displayRoundStatus(State):-
     getRoundNumber(State, RoundNumber),

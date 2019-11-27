@@ -1,0 +1,7 @@
+11/25/2019:
+- added the read from file functionality
+- worked on distribute hand. Does not work.
+
+11/27/2019:
+- passing the passed-in Hand into the distribute procedure did not work. 
+    So, instead returned a new hand from distribute procedure.
