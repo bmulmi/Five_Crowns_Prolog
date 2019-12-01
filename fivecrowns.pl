@@ -147,6 +147,128 @@ discardToPile(Card, [], NewDiscardPile):-
 discardToPile(Card, DiscardPile, NewDiscardPile):- 
     [Card | DiscardPile] = NewDiscardPile.
 
+getComputerMove(GameState, NewGameState):-
+    getHumanMenuAction(GameState, NewState),
+    NewGameState = NewState.
+
+outerSortCards(1, Cards, NewCards):-
+    NewCards = Cards.
+
+outerSortCards(Num, Cards, NewCards):-
+    NewNum is Num - 1,
+    sortCards(Cards, NewerCards),
+    outerSortCards(NewNum, NewerCards, NewestCards),
+    NewCards = NewestCards.
+
+sortCards([First | Rest], NewCards):-
+    [_ | RestRest] = Rest,
+    RestRest = [],
+    number(First),
+    number(Second),
+    First > Second,
+    [Second|First] = NewCards.
+
+sortCards([First | Rest], NewCards):-
+    [_ | RestRest] = Rest,
+    RestRest = [],
+    [First|Second] = NewCards.
+
+sortCards(Cards, NewCards):-
+    [First | Rest] = Cards,
+    [Second | RestRest] = Rest,
+    number(First),
+    number(Second),
+    First > Second,    
+    [First | RestRest] = NewerCards,
+    sortCards(NewerCards, NewestCards),
+    [Second | NewestCards] = NewCards.
+
+sortCards([First | Rest], NewCards):-
+    sortCards(Rest, NewerCards),
+    NewCards = NewerCards.
+
+getRuns(Hand, Books):-
+    getSameSuiteCards(s, Hand, Spades),
+    getSameSuiteCards(h, Hand, Hearts),
+    getSameSuiteCards(t, Hand, Tridents),
+    getSameSuiteCards(c, Hand, Clubs),
+    getSameSuiteCards(d, Hand, Diamonds).
+
+getSameSuiteCards(_, [], []).
+
+getSameSuiteCards(X, [First|Rest], SameFace):-
+    getSuiteFace(First, Suite, _),
+    getSameSuiteCards(X, Rest, NewSameFace),
+    Suite = X,
+    SameFace = [First | NewSameFace].
+
+getSameSuiteCards(X, [First|Rest], SameFace):-
+    getSuiteFace(First, Suite, _),
+    Suite \= X,
+    getSameSuiteCards(X, Rest, NewSameFace),
+    SameFace = NewSameFace.
+
+%begin check special cards
+isJokerOrWild(Card, RoundNum):-
+    Wild is RoundNum + 2,
+    write(Wild),
+    atom_chars(Card, Lst),
+    [_ | [Face | _]] = Lst,
+    write(Face),
+    Face == Wild.
+    %isWildCard(Card, RoundNum).
+
+isJokerOrWild(Card, _):-
+    isJoker(Card).
+
+isWildCard(Card, RoundNum):-
+    Wild is RoundNum + 2,
+    getSuiteFace(Card, _, Face),
+    faceValue(Face, Val),
+    %write(Face), write("="), write(Wild),nl,
+    Val = Wild.
+
+isJoker(Card):-
+    getSuiteFace(Card, Suite, _),
+    Suite = j.
+
+%end check special cards
+
+extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
+    isJokerOrWild(First,RoundNum),
+    extractSpecialCards(Rest, RoundNum, NewSpecialCards, NormalCards),
+    [First|NewSpecialCards] = SpecialCards.
+
+extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
+    \+ isJokerOrWild(First, RoundNum),
+    extractSpecialCards(Rest, RoundNum, SpecialCards, NewNormalCards),
+    [First|NewNormalCards] = NormalCards.
+
+%begin of checking Books
+isBook(Cards, RoundNum):-
+    extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
+    length(NormalCards, CardLen),
+    CardLen == 0.
+
+isBook(Cards, RoundNum):-
+    extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
+    length(NormalCards, CardLen),
+    CardLen \= 0,
+    isSameFace(NormalCards).
+
+isSameFace(Cards):-
+    length(Cards, Len),
+    Len =< 1.
+
+isSameFace(Cards):-
+    [First, Second | Rest] = Cards,
+    getSuiteFace(First, _, FirstFace),
+    getSuiteFace(Second, _, SecFace),
+    FirstFace == SecFace,
+    isSameFace([Second|Rest]).
+
+%end of checking Books
+
 getHumanMenuAction(GameState, NewGameState):- 
     nl, write("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"),nl,
     write("1. Make a move"), nl,
@@ -223,9 +345,7 @@ addPileCardToHand(1, GameState, NewGameState):-
     getDrawPile(GameState, Pile),
     popTopCard(Pile, NewPile, TopCard),
     getHumanHand(GameState, Hand),
-    write("adding.."), write(Hand), nl,
     [TopCard | Hand] = NewHand,
-    write("added: "), write(NewHand), nl,
     GameState = [Round, CompScore, CompHand, HumanScore, _, _, DiscardPile, NextPlayer],
     NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, NewPile, DiscardPile, NextPlayer].
     
@@ -274,9 +394,7 @@ removeCardFromHand(Card, Hand, NewHand):-
     removeCardFromHand(Card, Rest, NewerHand),
     [First | NewerHand] = NewHand.
 
-getComputerMove(GameState, NewGameState):-
-    getHumanMenuAction(GameState, NewState),
-    NewGameState = NewState.
+
 
 displayRoundStatus(State):-
     getRoundNumber(State, RoundNumber),
@@ -318,6 +436,10 @@ getDiscardPile(State, Pile):- nth0(6, State, Pile).
 
 getNextPlayer(State, NextPlayer):- nth0(7, State, NextPlayer).
 
+getSuiteFace(Card, Suite, Face):-
+    atom_chars(Card, ListCard),
+    [Suite | [Face|_]] = ListCard.
+
 askIfSaveAndQuit(Answer):- 
     write("Would you like to save and quit?(y/n)"),
     read(Choice), nl,
@@ -329,5 +451,14 @@ askIfSaveAndQuit(Answer):- askIfSaveAndQuit(NewAnswer),
 
 validateYesNoChoice(y).
 validateYesNoChoice(n).
+
+faceValue(Face, Value):-
+    number(Face),
+    Value = Face.
+
+faceValue(x, 10).
+faceValue(j, 11).
+faceValue(q, 12).
+faceValue(k, 13).
 
 printChoice(Choice):- write(Choice).
