@@ -26,4 +26,8 @@ Total Hours: 3.
 - added getCombos and divide procedure that will get all the combinations of the hand card.
 - added withoutLast procedure.
 - added getAllCardCombos procedure.
+- added getBooks procedure.
+- added getRuns procedure.
+Total Hours: 5.
+
 

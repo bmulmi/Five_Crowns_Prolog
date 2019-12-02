@@ -151,6 +151,194 @@ getComputerMove(GameState, NewGameState):-
     getHumanMenuAction(GameState, NewState),
     NewGameState = NewState.
 
+%begin which pile to choose hint
+getWhichPileHint(GameState, Hint):-
+    getNextPlayer(GameState, Player),
+    Player = human,
+    getRoundNumber(GameState, RoundNum),
+    getHumanHand(GameState, Hand),
+    getDiscardPile(GameState, DiscardPile),
+    getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile),
+    Hint = Pile.
+
+getWhichPileHint(GameState, Hint):-
+    getNextPlayer(GameState, Player),
+    Player = computer,
+    getRoundNumber(GameState, RoundNum),
+    getComputerHand(GameState, Hand),
+    getDiscardPile(GameState, DiscardPile),
+    getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile),
+    Hint = Pile.
+
+getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile):-
+    getLowestScore(Hand, RoundNum, 999, Scr),
+    popTopCard(DiscardPile, _, TopCard),
+    [TopCard | Hand] = NewHand,
+    removeEachCardAndCheck(NewHand, RoundNum, Scr),
+    Pile = 'discard'.
+
+getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile):-
+    getLowestScore(Hand, RoundNum, 999, Scr),
+    popTopCard(DiscardPile, _, TopCard),
+    [TopCard | Hand] = NewHand,
+    \+ removeEachCardAndCheck(NewHand, RoundNum, Scr),
+    Pile = 'draw'.
+
+removeEachCardAndCheck(Hand, RoundNum, Score):-
+    [Card | PrevHand] = Hand,
+    getListOfEachElementRemoved(PrevHand, PrevHand, RemHand),
+    addAtomToEachInList(Card, RemHand, NewHandList),
+    checkWhichHandHasLowerScore(NewHandList, RoundNum, Score, LowHand),
+    length(LowHand, Len),
+    Len = 1.
+
+%TODO need to check this
+checkWhichHandHasLowerScore([], _, _, []).
+
+checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
+    [First | Rest] = HandList,
+    getLowestScore(First, RoundNum, 999, Scr),
+    checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
+    Scr < Score,
+    LowHand = First.
+
+checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
+    [First | Rest] = HandList,
+    getLowestScore(First, RoundNum, 999, Scr),
+    checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
+    Scr >= Score,
+    LowHand = [].
+
+%end which pile to choose hint
+
+%begin which card to discard
+getWhichCardHint(GameState, Hint):-
+    getNextPlayer(GameState, Player),
+    Player = human,
+    getRoundNumber(GameState, RoundNum),
+    getHumanHand(GameState, Hand),
+    getWhichCardToDiscard(Hand, RoundNum, Card).
+    Hint = Card.
+
+getWhichCardHint(GameState, Hint):-
+    getNextPlayer(GameState, Player),
+    Player = computer,
+    getRoundNumber(GameState, RoundNum),
+    getComputerHand(GameState, Hand),
+    getWhichCardToDiscard(Hand, RoundNum, Card).
+    Hint = Card.
+
+getWhichCardToDiscard(Hand, RoundNum, Card):-
+    getListOfEachElementRemoved(Hand, Hand, NewHand),
+    [First | Rest] = NewHand,
+    getLowestScore(First, RoundNum, 999, Score),
+    checkWhichHandHasLowerScore(Rest, RoundNum, Score, LowHand),
+    length(LowHand, Len),
+    Len = 1,
+    subtract(Hand, LowHand, TempCard),
+    [Card|_] = TempCard.
+
+getWhichCardToDiscard(Hand, RoundNum, Card):-
+    getListOfEachElementRemoved(Hand, Hand, NewHand),
+    [First | Rest] = NewHand,
+    getLowestScore(First, RoundNum, 999, Score),
+    checkWhichHandHasLowerScore(Rest, RoundNum, Score, LowHand),
+    length(LowHand, Len),
+    Len = 0,
+    subtract(Hand, First, TempCard),
+    [Card|_] = TempCard.
+%end which card to discard
+
+addAtomToEachInList(_, [], []).
+addAtomToEachInList(Atom, Lists, NewLists):-
+    [First | Rest] = Lists,
+    [Atom | First] = NewFirst,
+    addAtomToEachInList(Atom, Rest, NewRests),
+    NewLists = [NewFirst | NewRests].
+
+getListOfEachElementRemoved(_, [], []).
+getListOfEachElementRemoved(List, RemList, NewList):-
+    [First | Rest] = RemList,
+    delete(List, First, NewerList),
+    write(NewerList),nl,
+    getListOfEachElementRemoved(List, Rest, NewestList),
+    NewList = [NewerList | NewestList].
+
+%main body of strategy
+getLowestScore([], _, LowestScore, 0):-
+    LowestScore = 999.
+
+getLowestScore(Hand, RoundNum, LowestScore, Score):-
+    sortCards(Hand, SortedHand),
+    getRuns(SortedHand, RoundNum, Runs),
+    getBooks(SortedHand, RoundNum, Books),
+    append(Runs, Books, BooksAndRuns),
+    length(BooksAndRuns, Len1),
+    Len1 = 0,
+    write("FInal Call."),nl,
+    calculateScore(SortedHand, RoundNum, NewScore),
+    LowestScore = Score,
+    Score = NewScore.
+
+getLowestScore(Hand, RoundNum, LowestScore, Score):-
+    sortCards(Hand, SortedHand),
+    write("Hand1: "), write(Hand),nl,
+    getRuns(SortedHand, RoundNum, Runs),
+    getBooks(SortedHand, RoundNum, Books),
+    append(Runs, Books, BooksAndRuns),
+    length(BooksAndRuns, Len1),
+    Len1 > 0,
+    [First|_] = BooksAndRuns,
+    write("BOR1:"), write(First),nl,
+    removeCardCollectionFromHand(First, SortedHand, NewHand),
+    write("REM2: "), write(NewHand),nl,
+    getLowestScore(NewHand, RoundNum, NewLowestScore, NewScore),
+    NewScore < LowestScore,
+    LowestScore = NewScore,
+    Score = NewScore.
+
+getLowestScore(Hand, RoundNum, LowestScore, Score):-
+    sortCards(Hand, SortedHand),
+    write("Hand2: "), write(Hand),nl,
+    getRuns(SortedHand, RoundNum, Runs),
+    getBooks(SortedHand, RoundNum, Books),
+    append(Runs, Books, BooksAndRuns),
+    write("BNR"), write(BooksAndRuns),nl,
+    length(BooksAndRuns, Len1),
+    Len1 > 0,
+    [First|_] = BooksAndRuns,
+    write("BOR:"), write(First),nl,
+    removeCardCollectionFromHand(First, SortedHand, NewHand),
+    write("REM: "), write(NewHand),nl,
+    
+    getLowestScore(NewHand, RoundNum, NewLowestScore, NewScore),
+    NewScore >= LowestScore,
+    LowestScore = NewLowestScore,
+    Score = NewScore.
+
+%end of main body of strategy
+calculateScore([], _, 0).
+calculateScore(Hand, RoundNum, Score):-
+    [First|Rest] = Hand,
+    isJoker(First),
+    calculateScore(Rest, RoundNum, NewScore),
+    Score is NewScore + 50.
+
+calculateScore(Hand, RoundNum, Score):-
+    [First|Rest] = Hand,
+    isWildCard(First, RoundNum),
+    calculateScore(Rest, RoundNum, NewScore),
+    Score is NewScore + 20.
+
+calculateScore(Hand, RoundNum, Score):-
+    [First|Rest] = Hand,
+    getSuiteFace(First, _, Face),
+    faceValue(Face, Val),
+    calculateScore(Rest, RoundNum, NewScore),
+    Score is NewScore + Val.
+
+
+%begin for get Runs
 getRuns(Hand, RoundNum, Runs):-
     sortCards(Hand, SortedHand),
     extractSpecialCards(SortedHand, RoundNum, SpecialCards, NormalCards),
@@ -192,16 +380,8 @@ isRun(Cards, RoundNum):-
     length(SpecialCards, SpecialLen),
     canBeRun(NormalCards, MissingCardCount),
     MissingCardCount =< SpecialLen.
+%end for get Runs
 
-hasSameSuite(Cards):-
-    length(Cards, Len),
-    Len =< 1.
-
-hasSameSuite([First, Second|Rest]):-
-    getSuiteFace(First, Suite1, _),
-    getSuiteFace(Second, Suite2, _),
-    Suite1 = Suite2,
-    hasSameSuite([Second|Rest]).
 
 %base case for canBeRun
 canBeRun(Cards, 0):-
@@ -234,6 +414,16 @@ canBeRun(Cards, MissingCardCount):-
     MissingCardCount is CardCount + NewCardCount.
 
 %begin helper for isRun
+hasSameSuite(Cards):-
+    length(Cards, Len),
+    Len =< 1.
+
+hasSameSuite([First, Second|Rest]):-
+    getSuiteFace(First, Suite1, _),
+    getSuiteFace(Second, Suite2, _),
+    Suite1 = Suite2,
+    hasSameSuite([Second|Rest]).
+
 getSameSuiteCards(_, [], []).
 
 getSameSuiteCards(S, [First|Rest], SameSuites):-
@@ -507,6 +697,15 @@ addPileCardToHand(2, GameState, NewGameState):-
     GameState = [Round, CompScore, _, HumanScore, HumanHand, DrawPile, _, NextPlayer],
     NewGameState = [Round, CompScore, NewHand, HumanScore, HumanHand, DrawPile, NewPile, NextPlayer].
 
+
+removeCardCollectionFromHand([], Hand, Hand).
+removeCardCollectionFromHand(_, [], []).
+removeCardCollectionFromHand(Collection, Hand, RemovedHand):-
+    [First|Rest] = Collection,
+    removeCardFromHand(First, Hand, NewHand),
+    removeCardCollectionFromHand(Rest, NewHand, NewerHand),
+    RemovedHand = NewerHand.
+
 removeCardFromHand(_, [], _):-
     write("Could not find card in Hand. Please enter the correct card.").
 
@@ -519,8 +718,6 @@ removeCardFromHand(Card, Hand, NewHand):-
     [First | Rest] = Hand,
     removeCardFromHand(Card, Rest, NewerHand),
     [First | NewerHand] = NewHand.
-
-
 
 displayRoundStatus(State):-
     getRoundNumber(State, RoundNumber),
