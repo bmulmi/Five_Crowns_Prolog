@@ -154,20 +154,31 @@ getComputerMove(GameState, NewGameState):-
 getRuns(Hand, RoundNum, Runs):-
     sortCards(Hand, SortedHand),
     extractSpecialCards(SortedHand, RoundNum, SpecialCards, NormalCards),
- 
-    getSameSuiteCards(s, SortedHand, Spades),
-    getSameSuiteCards(h, SortedHand, Hearts),
-    getSameSuiteCards(t, SortedHand, Tridents),
-    getSameSuiteCards(c, SortedHand, Clubs),
-    getSameSuiteCards(d, SortedHand, Diamonds),
-
+    
     getAllCardCombos(NormalCards, NormalCombos),
-    getAllCardCombos(SpecialCards, SpecialCombos).  
+    getAllCardCombos(SpecialCards, SpecialCombos),
+
+    getRunCombos(NormalCombos, RoundNum, NormalRuns),
+
+    addSpecialToNormalCombos(NormalCombos, SpecialCombos, CombinedCombos),
+    getRunCombos(CombinedCombos, RoundNum, CombinedRuns),
+
+    append(NormalRuns, CombinedRuns, Runs).
+
+getRunCombos([], _, []).
+getRunCombos([First|Rest], RoundNum, [First|NewRuns]):-
+    isRun(First, RoundNum),
+    getRunCombos(Rest, RoundNum, NewRuns).
+
+getRunCombos([First|Rest], RoundNum, NewRuns):-
+    \+ isRun(First, RoundNum),
+    getRunCombos(Rest, RoundNum, NewRuns).
 
 isRun(Cards, RoundNum):-
     length(Cards, CardLen1),
     CardLen1 > 2,
     extractSpecialCards(Cards, RoundNum, _, NormalCards),
+    hasSameSuite(NormalCards),
     length(NormalCards, CardLen2),
     CardLen2 = 0.
 
@@ -175,11 +186,22 @@ isRun(Cards, RoundNum):-
     length(Cards, CardLen1),
     CardLen1 > 2,
     extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
+    hasSameSuite(NormalCards),
     length(NormalCards, CardLen2),
     CardLen2 \= 0,
     length(SpecialCards, SpecialLen),
     canBeRun(NormalCards, MissingCardCount),
     MissingCardCount =< SpecialLen.
+
+hasSameSuite(Cards):-
+    length(Cards, Len),
+    Len =< 1.
+
+hasSameSuite([First, Second|Rest]):-
+    getSuiteFace(First, Suite1, _),
+    getSuiteFace(Second, Suite2, _),
+    Suite1 = Suite2,
+    hasSameSuite([Second|Rest]).
 
 %base case for canBeRun
 canBeRun(Cards, 0):-
