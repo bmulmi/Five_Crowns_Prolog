@@ -151,27 +151,80 @@ getComputerMove(GameState, NewGameState):-
     getHumanMenuAction(GameState, NewState),
     NewGameState = NewState.
 
-getRuns(Hand, Books):-
-    getSameSuiteCards(s, Hand, Spades),
-    getSameSuiteCards(h, Hand, Hearts),
-    getSameSuiteCards(t, Hand, Tridents),
-    getSameSuiteCards(c, Hand, Clubs),
-    getSameSuiteCards(d, Hand, Diamonds).
+getRuns(Hand, RoundNum, Runs):-
+    sortCards(Hand, SortedHand),
+    extractSpecialCards(SortedHand, RoundNum, SpecialCards, NormalCards),
+ 
+    getSameSuiteCards(s, SortedHand, Spades),
+    getSameSuiteCards(h, SortedHand, Hearts),
+    getSameSuiteCards(t, SortedHand, Tridents),
+    getSameSuiteCards(c, SortedHand, Clubs),
+    getSameSuiteCards(d, SortedHand, Diamonds),
+
+    getAllCardCombos(NormalCards, NormalCombos),
+    getAllCardCombos(SpecialCards, SpecialCombos).  
+
+isRun(Cards, RoundNum):-
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, _, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 = 0.
+
+isRun(Cards, RoundNum):-
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 \= 0,
+    length(SpecialCards, SpecialLen),
+    canBeRun(NormalCards, MissingCardCount),
+    MissingCardCount =< SpecialLen.
+
+%base case for canBeRun
+canBeRun(Cards, 0):-
+    length(Cards, Len),
+    Len =< 1.
+
+%when it is a perfect run
+canBeRun(Cards, MissingCardCount):-
+    [First, Second | Rest] = Cards,
+    getSuiteFace(First, _, F1),
+    getSuiteFace(Second, _, F2),
+    faceValue(F1, V1),
+    faceValue(F2, V2),
+    Dif is V2 - 1,
+    V1 = Dif,
+    canBeRun([Second|Rest], NewCardCount),
+    MissingCardCount = NewCardCount.
+
+%when there are missing cards in between,
+canBeRun(Cards, MissingCardCount):-
+    [First, Second | Rest] = Cards,
+    getSuiteFace(First, _, F1),
+    getSuiteFace(Second, _, F2),
+    faceValue(F1, V1),
+    faceValue(F2, V2),
+    Dif is V2 - 1,
+    V1 < Dif,
+    CardCount is V2 - V1 - 1,
+    canBeRun([Second|Rest], NewCardCount),
+    MissingCardCount is CardCount + NewCardCount.
 
 %begin helper for isRun
 getSameSuiteCards(_, [], []).
 
-getSameSuiteCards(X, [First|Rest], SameFace):-
+getSameSuiteCards(S, [First|Rest], SameSuites):-
     getSuiteFace(First, Suite, _),
-    getSameSuiteCards(X, Rest, NewSameFace),
-    Suite = X,
-    SameFace = [First | NewSameFace].
+    S = Suite,
+    getSameSuiteCards(S, Rest, NewSameSuites),
+    SameSuites = [First | NewSameSuites].
 
-getSameSuiteCards(X, [First|Rest], SameFace):-
+getSameSuiteCards(S, [First|Rest], SameSuites):-
     getSuiteFace(First, Suite, _),
-    Suite \= X,
-    getSameSuiteCards(X, Rest, NewSameFace),
-    SameFace = NewSameFace.
+    S \= Suite,
+    getSameSuiteCards(S, Rest, NewSameSuites),
+    SameSuites = NewSameSuites.
 
 cardCompare(>, C1, C2):-
     getSuiteFace(C1, _, F1),
@@ -207,6 +260,45 @@ getBooks(Hand, RoundNum, Books):-
     
     append(NormalBooks, CombinedBooks, Books).
 
+getBookCombos([], _, []).
+getBookCombos(CardList, RoundNum, Books):-
+    [First|Rest] = CardList,
+    isBook(First, RoundNum),
+    getBookCombos(Rest, RoundNum, NewBooks),
+    Books = [First | NewBooks].
+
+getBookCombos(Cards, RoundNum, Books):-
+    [First|Rest] = Cards,
+    \+ isBook(First, RoundNum),
+    getBookCombos(Rest, RoundNum, NewBooks),
+    Books = NewBooks.
+
+isBook(Cards, RoundNum):-
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, _, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 = 0.
+
+isBook(Cards, RoundNum):-
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, _, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 \= 0,
+    isSameFace(NormalCards).
+
+isSameFace(Cards):-
+    length(Cards, Len),
+    Len =< 1.
+
+isSameFace(Cards):-
+    [First, Second | Rest] = Cards,
+    getSuiteFace(First, _, FirstFace),
+    getSuiteFace(Second, _, SecFace),
+    FirstFace = SecFace,
+    isSameFace([Second|Rest]).
+
 addSpecialToNormalCombos([], _, []).
 addSpecialToNormalCombos(Normal, Special, Combined):-
     [FirstNormal | RestNormal] = Normal,
@@ -221,19 +313,6 @@ addEachToCombo(Normal, SpecialList, Combined):-
     addEachToCombo(Normal, Rest, NewCombined),
     Combined = [NewNormal | NewCombined].
 
-getBookCombos([], _, []).
-getBookCombos(CardList, RoundNum, Books):-
-    [First|Rest] = CardList,
-    isBook(First, RoundNum),
-    getBookCombos(Rest, RoundNum, NewBooks),
-    Books = [First | NewBooks].
-
-getBookCombos(Cards, RoundNum, Books):-
-    [First|Rest] = Cards,
-    \+ isBook(First, RoundNum),
-    getBookCombos(Rest, RoundNum, NewBooks),
-    Books = NewBooks.
-
 %end to get all Books
 
 divide([], []).
@@ -244,7 +323,7 @@ divide(X, Return):-
 
 getCombos([], []).
 getCombos(X,Return):-
-    [H|T] = X,
+    [_|T] = X,
     getCombos(T, NewerRet),
     divide(X, NewRet),
     Return = [NewRet|NewerRet].
@@ -280,34 +359,6 @@ isJoker(Card):-
 
 %end check special cards
 
-%begin of checking Books
-isBook(Cards, RoundNum):-
-    length(Cards, CardLen1),
-    CardLen1 > 2,
-    extractSpecialCards(Cards, RoundNum, _, NormalCards),
-    length(NormalCards, CardLen2),
-    CardLen2 = 0.
-
-isBook(Cards, RoundNum):-
-    length(Cards, CardLen1),
-    CardLen1 > 2,
-    extractSpecialCards(Cards, RoundNum, SP, NormalCards),
-    length(NormalCards, CardLen2),
-    CardLen2 \= 0,
-    isSameFace(NormalCards).
-
-isSameFace(Cards):-
-    length(Cards, Len),
-    Len =< 1.
-
-isSameFace(Cards):-
-    [First, Second | Rest] = Cards,
-    getSuiteFace(First, _, FirstFace),
-    getSuiteFace(Second, _, SecFace),
-    FirstFace = SecFace,
-    isSameFace([Second|Rest]).
-
-%end of checking Books
 
 %begin to get jokers and wilds
 extractSpecialCards([], _, [], []).
