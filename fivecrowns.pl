@@ -151,42 +151,6 @@ getComputerMove(GameState, NewGameState):-
     getHumanMenuAction(GameState, NewState),
     NewGameState = NewState.
 
-outerSortCards(1, Cards, NewCards):-
-    NewCards = Cards.
-
-outerSortCards(Num, Cards, NewCards):-
-    NewNum is Num - 1,
-    sortCards(Cards, NewerCards),
-    outerSortCards(NewNum, NewerCards, NewestCards),
-    NewCards = NewestCards.
-
-sortCards([First | Rest], NewCards):-
-    [_ | RestRest] = Rest,
-    RestRest = [],
-    number(First),
-    number(Second),
-    First > Second,
-    [Second|First] = NewCards.
-
-sortCards([First | Rest], NewCards):-
-    [_ | RestRest] = Rest,
-    RestRest = [],
-    [First|Second] = NewCards.
-
-sortCards(Cards, NewCards):-
-    [First | Rest] = Cards,
-    [Second | RestRest] = Rest,
-    number(First),
-    number(Second),
-    First > Second,    
-    [First | RestRest] = NewerCards,
-    sortCards(NewerCards, NewestCards),
-    [Second | NewestCards] = NewCards.
-
-sortCards([First | Rest], NewCards):-
-    sortCards(Rest, NewerCards),
-    NewCards = NewerCards.
-
 getRuns(Hand, Books):-
     getSameSuiteCards(s, Hand, Spades),
     getSameSuiteCards(h, Hand, Hearts),
@@ -194,6 +158,7 @@ getRuns(Hand, Books):-
     getSameSuiteCards(c, Hand, Clubs),
     getSameSuiteCards(d, Hand, Diamonds).
 
+%begin helper for isRun
 getSameSuiteCards(_, [], []).
 
 getSameSuiteCards(X, [First|Rest], SameFace):-
@@ -208,15 +173,97 @@ getSameSuiteCards(X, [First|Rest], SameFace):-
     getSameSuiteCards(X, Rest, NewSameFace),
     SameFace = NewSameFace.
 
+cardCompare(>, C1, C2):-
+    getSuiteFace(C1, _, F1),
+    faceValue(F1, V1),
+    getSuiteFace(C2, _, F2),
+    faceValue(F2, V2),
+    V1 > V2.
+
+cardCompare(<, C1, C2):-
+    getSuiteFace(C1, _, F1),
+    faceValue(F1, V1),
+    getSuiteFace(C2, _, F2),
+    faceValue(F2, V2),
+    V1 =< V2.
+
+sortCards(List, SortedList):-
+    predsort(cardCompare, List, SortedList).
+
+%end helper for isRun
+
+%begin to get all Books
+getBooks(Hand, RoundNum, Books):-
+    sortCards(Hand, SortedHand),
+    extractSpecialCards(SortedHand, RoundNum, SpecialCards, NormalCards),
+    
+    getAllCardCombos(NormalCards, NormalCombos),
+    getAllCardCombos(SpecialCards, SpecialCombos),
+    
+    getBookCombos(NormalCombos, RoundNum, NormalBooks),
+
+    addSpecialToNormalCombos(NormalCombos, SpecialCombos, CombinedCombos),
+    getBookCombos(CombinedCombos, RoundNum, CombinedBooks),
+    
+    append(NormalBooks, CombinedBooks, Books).
+
+addSpecialToNormalCombos([], _, []).
+addSpecialToNormalCombos(Normal, Special, Combined):-
+    [FirstNormal | RestNormal] = Normal,
+    addEachToCombo(FirstNormal, Special, NewCombined),
+    addSpecialToNormalCombos(RestNormal, Special, ReturningCombined),
+    append(NewCombined, ReturningCombined, Combined).
+
+addEachToCombo(_, [], []).
+addEachToCombo(Normal, SpecialList, Combined):-
+    [First | Rest] = SpecialList,
+    append(Normal, First, NewNormal),
+    addEachToCombo(Normal, Rest, NewCombined),
+    Combined = [NewNormal | NewCombined].
+
+getBookCombos([], _, []).
+getBookCombos(CardList, RoundNum, Books):-
+    [First|Rest] = CardList,
+    isBook(First, RoundNum),
+    getBookCombos(Rest, RoundNum, NewBooks),
+    Books = [First | NewBooks].
+
+getBookCombos(Cards, RoundNum, Books):-
+    [First|Rest] = Cards,
+    \+ isBook(First, RoundNum),
+    getBookCombos(Rest, RoundNum, NewBooks),
+    Books = NewBooks.
+
+%end to get all Books
+
+divide([], []).
+divide(X, Return):- 
+    [H|T] = X,
+    divide(T, Newerlist),
+    Return = [H|Newerlist].
+
+getCombos([], []).
+getCombos(X,Return):-
+    [H|T] = X,
+    getCombos(T, NewerRet),
+    divide(X, NewRet),
+    Return = [NewRet|NewerRet].
+
+getAllCardCombos([],[]).
+getAllCardCombos(Card, Combinations):-
+    getCombos(Card, Newlist),
+    without_last(Card, NewHand),
+    getAllCardCombos(NewHand, NewCombo),
+    append(Newlist, NewCombo, Combinations).
+
+without_last([_], []).
+without_last([First|Rest], [First|WithoutLast]) :- 
+    without_last(Rest, WithoutLast).
+
+
 %begin check special cards
 isJokerOrWild(Card, RoundNum):-
-    Wild is RoundNum + 2,
-    write(Wild),
-    atom_chars(Card, Lst),
-    [_ | [Face | _]] = Lst,
-    write(Face),
-    Face == Wild.
-    %isWildCard(Card, RoundNum).
+    isWildCard(Card, RoundNum).
 
 isJokerOrWild(Card, _):-
     isJoker(Card).
@@ -225,7 +272,6 @@ isWildCard(Card, RoundNum):-
     Wild is RoundNum + 2,
     getSuiteFace(Card, _, Face),
     faceValue(Face, Val),
-    %write(Face), write("="), write(Wild),nl,
     Val = Wild.
 
 isJoker(Card):-
@@ -234,26 +280,20 @@ isJoker(Card):-
 
 %end check special cards
 
-extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
-    isJokerOrWild(First,RoundNum),
-    extractSpecialCards(Rest, RoundNum, NewSpecialCards, NormalCards),
-    [First|NewSpecialCards] = SpecialCards.
-
-extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
-    \+ isJokerOrWild(First, RoundNum),
-    extractSpecialCards(Rest, RoundNum, SpecialCards, NewNormalCards),
-    [First|NewNormalCards] = NormalCards.
-
 %begin of checking Books
 isBook(Cards, RoundNum):-
-    extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
-    length(NormalCards, CardLen),
-    CardLen == 0.
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, _, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 = 0.
 
 isBook(Cards, RoundNum):-
-    extractSpecialCards(Cards, RoundNum, SpecialCards, NormalCards),
-    length(NormalCards, CardLen),
-    CardLen \= 0,
+    length(Cards, CardLen1),
+    CardLen1 > 2,
+    extractSpecialCards(Cards, RoundNum, SP, NormalCards),
+    length(NormalCards, CardLen2),
+    CardLen2 \= 0,
     isSameFace(NormalCards).
 
 isSameFace(Cards):-
@@ -264,10 +304,23 @@ isSameFace(Cards):-
     [First, Second | Rest] = Cards,
     getSuiteFace(First, _, FirstFace),
     getSuiteFace(Second, _, SecFace),
-    FirstFace == SecFace,
+    FirstFace = SecFace,
     isSameFace([Second|Rest]).
 
 %end of checking Books
+
+%begin to get jokers and wilds
+extractSpecialCards([], _, [], []).
+extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
+    isJokerOrWild(First,RoundNum),
+    extractSpecialCards(Rest, RoundNum, NewSpecialCards, NormalCards),
+    [First|NewSpecialCards] = SpecialCards.
+
+extractSpecialCards([First|Rest], RoundNum, SpecialCards, NormalCards):-
+    \+ isJokerOrWild(First, RoundNum),
+    extractSpecialCards(Rest, RoundNum, SpecialCards, NewNormalCards),
+    [First|NewNormalCards] = NormalCards.
+%end to get jokers and wilds
 
 getHumanMenuAction(GameState, NewGameState):- 
     nl, write("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"),nl,
@@ -453,8 +506,8 @@ validateYesNoChoice(y).
 validateYesNoChoice(n).
 
 faceValue(Face, Value):-
-    number(Face),
-    Value = Face.
+    atom_number(Face, Num),
+    Value = Num.
 
 faceValue(x, 10).
 faceValue(j, 11).

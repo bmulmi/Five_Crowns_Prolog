@@ -14,3 +14,16 @@ Total Hours: 3.
 - added procedures that will provide hint.
 Total Hours: 2.
 
+11/31/2019:
+- added the isBook procedure.
+- added the isSameFace procedure.
+- added isJoker boolean procedure.
+- added isWildCard boolean procedure.
+- added the getSameSuite procedure.
+Total Hours: 3.
+
+12/1/2019:
+- added getCombos and divide procedure that will get all the combinations of the hand card.
+- added withoutLast procedure.
+- added getAllCardCombos procedure.
+
