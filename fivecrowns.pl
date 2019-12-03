@@ -265,56 +265,48 @@ getListOfEachElementRemoved(List, RemList, NewList):-
     NewList = [NewerList | NewestList].
 
 %main body of strategy
-getLowestScore([], _, LowestScore, 0):-
-    LowestScore = 999.
+getLowestScoreCombos(_, [], _, [], 9999).
+getLowestScoreCombos(Hand, BnR, RoundNum, AssembledHand, Score):-
+    [FirstBnR | RestBnR] = BnR,
+    write("BNR: "), write(BnR),nl,
+    removeCardCollectionFromHand(FirstBnR, Hand, NewHand),
+    write("Removed: "), write(NewHand), nl,
+    getLowestScore(NewHand, RoundNum, FirstBnR, NewAssembled, NewScore),
+    getLowestScoreCombos(Hand, RestBnR, RoundNum, NewerAssembled, NewerScore),
+    getTheLowerScoreCombo(NewAssembled, NewScore, NewerAssembled, NewerScore, RetAssembled, RetScore),
+    AssembledHand = RetAssembled,
+    Score = RetScore.
 
-getLowestScore(Hand, RoundNum, LowestScore, Score):-
+getTheLowerScoreCombo(Assembled1, Score1, _, Score2, RetAssembled, RetScore):-
+    Score1 < Score2,
+    RetAssembled = Assembled1,
+    RetScore = Score1.
+
+getTheLowerScoreCombo(_, Score1, Assembled2, Score2, RetAssembled, RetScore):-
+    Score1 >= Score2,
+    RetAssembled = Assembled2,
+    RetScore = Score2.
+
+getLowestScore([], _, RemovedNode, [RemovedNode], 0).
+
+getLowestScore(Hand, RoundNum, RemovedNode, AssembledHand, Score):-
     sortCards(Hand, SortedHand),
-    getRuns(SortedHand, RoundNum, Runs),
-    getBooks(SortedHand, RoundNum, Books),
-    append(Runs, Books, BooksAndRuns),
+    getBooksAndRuns(SortedHand, RoundNum, BooksAndRuns),
     length(BooksAndRuns, Len1),
+    write(Len1),nl,
     Len1 = 0,
-    write("FInal Call."),nl,
     calculateScore(SortedHand, RoundNum, NewScore),
-    LowestScore = Score,
+append(RemovedNode, Hand, AssembledHand),
     Score = NewScore.
 
-getLowestScore(Hand, RoundNum, LowestScore, Score):-
+getLowestScore(Hand, RoundNum, RemovedNode, AssembledHand, Score):-
     sortCards(Hand, SortedHand),
-    write("Hand1: "), write(Hand),nl,
-    getRuns(SortedHand, RoundNum, Runs),
-    getBooks(SortedHand, RoundNum, Books),
-    append(Runs, Books, BooksAndRuns),
+    getBooksAndRuns(SortedHand, RoundNum, BooksAndRuns),
     length(BooksAndRuns, Len1),
+    write(Len1),nl,
     Len1 > 0,
-    [First|_] = BooksAndRuns,
-    write("BOR1:"), write(First),nl,
-    removeCardCollectionFromHand(First, SortedHand, NewHand),
-    write("REM2: "), write(NewHand),nl,
-    getLowestScore(NewHand, RoundNum, NewLowestScore, NewScore),
-    NewScore < LowestScore,
-    LowestScore = NewScore,
-    Score = NewScore.
-
-getLowestScore(Hand, RoundNum, LowestScore, Score):-
-    sortCards(Hand, SortedHand),
-    write("Hand2: "), write(Hand),nl,
-    getRuns(SortedHand, RoundNum, Runs),
-    getBooks(SortedHand, RoundNum, Books),
-    append(Runs, Books, BooksAndRuns),
-    write("BNR"), write(BooksAndRuns),nl,
-    length(BooksAndRuns, Len1),
-    Len1 > 0,
-    [First|_] = BooksAndRuns,
-    write("BOR:"), write(First),nl,
-    removeCardCollectionFromHand(First, SortedHand, NewHand),
-    write("REM: "), write(NewHand),nl,
-    
-    getLowestScore(NewHand, RoundNum, NewLowestScore, NewScore),
-    NewScore >= LowestScore,
-    LowestScore = NewLowestScore,
-    Score = NewScore.
+    getLowestScoreCombos(Hand, BooksAndRuns, RoundNum, NewAssembledHand, Score),
+    append(RemovedNode, NewAssembledHand, AssembledHand).
 
 %end of main body of strategy
 calculateScore([], _, 0).
@@ -337,13 +329,27 @@ calculateScore(Hand, RoundNum, Score):-
     calculateScore(Rest, RoundNum, NewScore),
     Score is NewScore + Val.
 
+getBooksAndRuns(Hand, RoundNum, BooksAndRuns):-
+    getRuns(Hand, RoundNum, Runs),
+    getBooks(Hand, RoundNum, Books),
+    append(Runs, Books, BooksAndRuns).
 
 %begin for get Runs
 getRuns(Hand, RoundNum, Runs):-
     sortCards(Hand, SortedHand),
     extractSpecialCards(SortedHand, RoundNum, SpecialCards, NormalCards),
     
-    getAllCardCombos(NormalCards, NormalCombos),
+    getSameSuiteCards(s, NormalCards, Spades),
+    getSameSuiteCards(t, NormalCards, Tridents),
+    getSameSuiteCards(d, NormalCards, Diamonds),
+    getSameSuiteCards(c, NormalCards, Clubs),
+    getSameSuiteCards(h, NormalCards, Hearts),
+    append(Spades, Tridents, Temp),
+    append(Diamonds, Temp, Temp2),
+    append(Clubs, Temp2, Temp3),
+    append(Hearts, Temp3, Temp4),
+    
+    getAllCardCombos(Temp4, NormalCombos),
     getAllCardCombos(SpecialCards, SpecialCombos),
 
     getRunCombos(NormalCombos, RoundNum, NormalRuns),
