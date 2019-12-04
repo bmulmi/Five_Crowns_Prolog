@@ -157,7 +157,10 @@ getWhichPileHint(GameState, Hint):-
     Player = human,
     getRoundNumber(GameState, RoundNum),
     getHumanHand(GameState, Hand),
+    getLowestScore(Hand, RoundNum, [], _, CurrScore),
     getDiscardPile(GameState, DiscardPile),
+    popTopCard(DiscardPile, _, TopCard),
+    [TopCard | Hand] = NewHand,
     getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile),
     Hint = Pile.
 
@@ -166,23 +169,28 @@ getWhichPileHint(GameState, Hint):-
     Player = computer,
     getRoundNumber(GameState, RoundNum),
     getComputerHand(GameState, Hand),
+    getLowestScore(Hand, RoundNum, [], AssembledHand, CurrScore),
+
     getDiscardPile(GameState, DiscardPile),
-    getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile),
+    popTopCard(DiscardPile, _, TopCard),
+    NewHand = [TopCard | Hand],
+
+    getListOfEachElementRemoved(Hand, Hand, ListHands),
+    [First | WithDCard] = ListHands,
+
+    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, Pile),
     Hint = Pile.
 
-getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile):-
-    getLowestScore(Hand, RoundNum, 999, Scr),
-    popTopCard(DiscardPile, _, TopCard),
-    [TopCard | Hand] = NewHand,
-    removeEachCardAndCheck(NewHand, RoundNum, Scr),
-    Pile = 'discard'.
+getPileToChoose(ListHands, RoundNum, PrevScore, )
 
-getWhichPileToChoose(Hand, RoundNum, DiscardPile, Pile):-
-    getLowestScore(Hand, RoundNum, 999, Scr),
-    popTopCard(DiscardPile, _, TopCard),
-    [TopCard | Hand] = NewHand,
-    \+ removeEachCardAndCheck(NewHand, RoundNum, Scr),
-    Pile = 'draw'.
+getWhichPileToChoose([], _, _, 9999).
+getWhichPileToChoose(ListHands, RoundNum, Score, OtherScore):-
+    [First | Rest] = ListHands,
+    getLowestScore(First, RoundNum, [], _, Score1),
+    getWhichPileToChoose(Rest, RoundNum, Score, Score2)
+    getTheLowerScoreCombo(_, Score1, _, Score2, _, LScore),
+    OtherScore = LScore,
+    OtherScore < Score.
 
 removeEachCardAndCheck(Hand, RoundNum, Score):-
     [Card | PrevHand] = Hand,
@@ -197,14 +205,14 @@ checkWhichHandHasLowerScore([], _, _, []).
 
 checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
     [First | Rest] = HandList,
-    getLowestScore(First, RoundNum, 999, Scr),
+    getLowestScore(First, RoundNum, [], _, Scr),
     checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
     Scr < Score,
     LowHand = First.
 
 checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
     [First | Rest] = HandList,
-    getLowestScore(First, RoundNum, 999, Scr),
+    getLowestScore(First, RoundNum, [], _, Scr),
     checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
     Scr >= Score,
     LowHand = [].
@@ -217,7 +225,8 @@ getWhichCardHint(GameState, Hint):-
     Player = human,
     getRoundNumber(GameState, RoundNum),
     getHumanHand(GameState, Hand),
-    getWhichCardToDiscard(Hand, RoundNum, Card).
+    getListOfEachElementRemoved(Hand, Hand, ListHands),
+    getWhichCardToDiscard(Hand, ListHands, RoundNum, 9999, Card),
     Hint = Card.
 
 getWhichCardHint(GameState, Hint):-
@@ -225,28 +234,31 @@ getWhichCardHint(GameState, Hint):-
     Player = computer,
     getRoundNumber(GameState, RoundNum),
     getComputerHand(GameState, Hand),
-    getWhichCardToDiscard(Hand, RoundNum, Card).
+    getListOfEachElementRemoved(Hand, Hand, ListHands),
+    getWhichCardToDiscard(Hand, ListHands, RoundNum, Score, Card),
     Hint = Card.
 
-getWhichCardToDiscard(Hand, RoundNum, Card):-
-    getListOfEachElementRemoved(Hand, Hand, NewHand),
-    [First | Rest] = NewHand,
-    getLowestScore(First, RoundNum, 999, Score),
-    checkWhichHandHasLowerScore(Rest, RoundNum, Score, LowHand),
-    length(LowHand, Len),
-    Len = 1,
-    subtract(Hand, LowHand, TempCard),
-    [Card|_] = TempCard.
-
-getWhichCardToDiscard(Hand, RoundNum, Card):-
-    getListOfEachElementRemoved(Hand, Hand, NewHand),
-    [First | Rest] = NewHand,
-    getLowestScore(First, RoundNum, 999, Score),
-    checkWhichHandHasLowerScore(Rest, RoundNum, Score, LowHand),
-    length(LowHand, Len),
-    Len = 0,
+getWhichCardToDiscard(_, [], _, 9999, garbage).
+getWhichCardToDiscard(Hand, ListHands, RoundNum, Score, Card):-
+    [First | Rest] = ListHands,
+    getLowestScore(First, RoundNum, [], _, Score1),
     subtract(Hand, First, TempCard),
-    [Card|_] = TempCard.
+    [DiscardedCard1|_] = TempCard,
+    write(First), write(':'),write(Score1),write(DiscardedCard1),nl,
+    getWhichCardToDiscard(Hand, Rest, RoundNum, Score2, DiscardedCard2),
+    getTheLowerScoreCombo(DiscardedCard1, Score1, DiscardedCard2, Score2, DCard, DScore),
+    Score = DScore,
+    Card = DCard.
+
+getHigherScore(Card1, Score1, _, Score2, Card, Score):-
+    Score1 >= Score2,
+    Card = Card1,
+    Score = Score1.
+
+getHigherScore(_, Score1, Card2, Score2, Card, Score):-
+    Score1 < Score2,
+    Card = Card2,
+    Score = Score2.
 %end which card to discard
 
 addAtomToEachInList(_, [], []).
@@ -268,9 +280,7 @@ getListOfEachElementRemoved(List, RemList, NewList):-
 getLowestScoreCombos(_, [], _, [], 9999).
 getLowestScoreCombos(Hand, BnR, RoundNum, AssembledHand, Score):-
     [FirstBnR | RestBnR] = BnR,
-    write("BNR: "), write(BnR),nl,
     removeCardCollectionFromHand(FirstBnR, Hand, NewHand),
-    write("Removed: "), write(NewHand), nl,
     getLowestScore(NewHand, RoundNum, FirstBnR, NewAssembled, NewScore),
     getLowestScoreCombos(Hand, RestBnR, RoundNum, NewerAssembled, NewerScore),
     getTheLowerScoreCombo(NewAssembled, NewScore, NewerAssembled, NewerScore, RetAssembled, RetScore),
@@ -293,22 +303,20 @@ getLowestScore(Hand, RoundNum, RemovedNode, AssembledHand, Score):-
     sortCards(Hand, SortedHand),
     getBooksAndRuns(SortedHand, RoundNum, BooksAndRuns),
     length(BooksAndRuns, Len1),
-    write(Len1),nl,
     Len1 = 0,
     calculateScore(SortedHand, RoundNum, NewScore),
-append(RemovedNode, Hand, AssembledHand),
+    AssembledHand = [RemovedNode | [Hand]],
     Score = NewScore.
 
 getLowestScore(Hand, RoundNum, RemovedNode, AssembledHand, Score):-
     sortCards(Hand, SortedHand),
     getBooksAndRuns(SortedHand, RoundNum, BooksAndRuns),
     length(BooksAndRuns, Len1),
-    write(Len1),nl,
     Len1 > 0,
     getLowestScoreCombos(Hand, BooksAndRuns, RoundNum, NewAssembledHand, Score),
-    append(RemovedNode, NewAssembledHand, AssembledHand).
-
+    AssembledHand = [RemovedNode | NewAssembledHand].
 %end of main body of strategy
+
 calculateScore([], _, 0).
 calculateScore(Hand, RoundNum, Score):-
     [First|Rest] = Hand,

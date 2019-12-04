@@ -30,4 +30,11 @@ Total Hours: 3.
 - added getRuns procedure.
 Total Hours: 5.
 
+12/2/2019:
+- added the main strategy of the game, the getlowestscore function.
+Total Hours: 3.
+
+12/3/2019:
+- added getWhichCardToDiscard hint.
+Total Hours: 1.
 
