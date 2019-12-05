@@ -31,8 +31,8 @@ getGameFromFile(Game) :-
     Game = NewGame.
 
 newGame(_):-
-    %coinToss(NextPlayer),
-    %playGame(1, [], 0, [], 0, NextPlayer, false).
+    coinToss(NextPlayer),
+    playGame(1, [], 0, [], 0, NextPlayer, false).
     playGame(1, [], 0, [], 0, human, false).
     
 coinToss(NextPlayer):-
@@ -148,21 +148,52 @@ discardToPile(Card, DiscardPile, NewDiscardPile):-
     [Card | DiscardPile] = NewDiscardPile.
 
 getComputerMove(GameState, NewGameState):-
-    %getWhichPileHint(GameState, Hint),
-    %Hint = draw,
+    getWhichPileHint(GameState, Hint),
+    Hint = draw,
     write("Computer chose draw pile to pick the card because discard pile did not help in making more runs or books"),nl,
+    computerChooseDrawPile(GameState, NewState),
+    NewGameState = NewState.
+
+getComputerMove(GameState, NewGameState):-
+    getWhichPileHint(GameState, Hint),
+    Hint = discard,
+    write("Computer chose discard pile to pick the card because it helped in making more runs or books."),nl,
+    computerChooseDiscardPile(GameState, NewState),
+    NewGameState = NewState.
+
+computerChooseDrawPile(GameState, NewGameState):-
     getDrawPile(GameState, DrawPile),
     getDiscardPile(GameState, DiscardPile),
     getComputerHand(GameState, Hand),
     getRoundNumber(GameState, RoundNum),
+
     popTopCard(DrawPile, NewDrawPile, Card),
     [Card | Hand] = TempHand,
+
     getWhichCardHint(RoundNum, TempHand, CardToDiscard),
     write("Computer discarded "), write(CardToDiscard), write(" because it made the score lower."),nl,nl,
+
     removeCardFromHand(CardToDiscard, TempHand, NewHand),
     discardToPile(CardToDiscard, DiscardPile, NewDiscardPile),
+
     GameState = [_, CompScore, _, HumanScr, HumanHand, _, _, _],
     NewGameState = [RoundNum, CompScore, NewHand, HumanScr, HumanHand, NewDrawPile, NewDiscardPile, human].
+
+computerChooseDiscardPile(GameState, NewGameState):-
+    getDiscardPile(GameState, DiscardPile),
+    getComputerHand(GameState, Hand),
+    getRoundNumber(GameState, RoundNum),
+
+    popTopCard(DiscardPile, NewDiscardPile, Card),
+    [Card | Hand] = TempHand,
+
+    getWhichCardHint(RoundNum, TempHand, CardToDiscard),
+    write("Computer discarded "), write(CardToDiscard), write(" because it made the score lower."),nl,nl,
+
+    removeCardFromHand(CardToDiscard, TempHand, NewHand),
+    discardToPile(CardToDiscard, NewDiscardPile, NewerDiscardPile),
+    GameState = [_, CompScore, _, HumanScr, HumanHand, DrawPile, _, _],
+    NewGameState = [RoundNum, CompScore, NewHand, HumanScr, HumanHand, DrawPile, NewerDiscardPile, human].
 
 %begin which pile to choose hint
 getWhichPileHint(GameState, Hint):-
@@ -180,8 +211,8 @@ getWhichPileHint(GameState, Hint):-
     getListOfEachElementRemoved(NewHand, NewHand, ListHands),
     [_ | WithDCard] = ListHands,
 
-    %getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
-    Hint = draw.
+    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
+    Hint = Pile.
 
 getWhichPileHint(GameState, Hint):-
     getNextPlayer(GameState, Player),
@@ -198,31 +229,32 @@ getWhichPileHint(GameState, Hint):-
     getListOfEachElementRemoved(NewHand, NewHand, ListHands),
     [_ | WithDCard] = ListHands,
 
-    %getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
-    Hint = draw.
+    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
+    Hint = Pile.
 
 getWhichPileToChoose([], _, _, _, draw).
 getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
     [First | Rest] = ListHands,
-    getLowestScore(First, RoundNum, [], AssembledLen1, Score1),
-    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, _),
+    getLowestScore(First, RoundNum, [], Assembled1, Score1),
+    length(Assembled1, AssembledLen1),
     Score1 < Score,
     AssembledLen1 > AssembledLen,
     Pile = discard.
 
 getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
     [First | Rest] = ListHands,
-    getLowestScore(First, RoundNum, [], AssembledLen1, Score1),
-    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, NewPile),
+    getLowestScore(First, RoundNum, [], Assembled1, Score1),
+    length(Assembled1, AssembledLen1),
     Score1 < Score,
     AssembledLen1 =< AssembledLen,
+    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, NewPile),
     Pile = NewPile.
 
 getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
     [First | Rest] = ListHands,
     getLowestScore(First, RoundNum, [], _, Score1),
-    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, NewPile),
     Score1 >= Score,
+    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, NewPile),
     Pile = NewPile.
 
 removeEachCardAndCheck(Hand, RoundNum, Score):-
@@ -256,7 +288,6 @@ checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
 getWhichCardHint(RoundNum, Hand, Hint):-
     getListOfEachElementRemoved(Hand, Hand, ListHands),
     getWhichCardToDiscard(Hand, ListHands, RoundNum, _, Card),
-    write("You should discard: "), write(Card),nl,
     Hint = Card.
 
 getWhichCardToDiscard(_, [], _, 9999, garbage).
@@ -280,7 +311,7 @@ getWhichCardToDiscard(Hand, ListHands, RoundNum, Score, Card):-
     getLowestScore(First, RoundNum, [], _, Score1),
     subtract(Hand, First, TempCard),
     [DiscardedCard1|_] = TempCard,
-    write(First), write(':'),write(Score1),write(DiscardedCard1),nl,
+    write(First), write(':'),write(Score1), write(":"),write(DiscardedCard1),nl,
     getWhichCardToDiscard(Hand, Rest, RoundNum, Score2, DiscardedCard2),
     getTheLowerScoreCombo(DiscardedCard1, Score1, DiscardedCard2, Score2, DCard, DScore),
     Score = DScore,
@@ -663,11 +694,8 @@ getHumanChoiceAction(1, GameState, NewGameState):-
     NewGameState = NewestGameState.
 
 getHumanChoiceAction(2, GameState, NewGameState):-
-    write("Hint: "), nl,
-    getHumanHand(GameState, Hand),
-    getRoundNumber(GameState, RoundNum),
-    %getWhichPileHint(human, RoundNum, Hand, Hint),
-    write("Hint Recieved: "), write("No hint available at this time..."),nl,
+    getWhichPileHint(GameState, Hint),
+    write("You should pick from "), write(Hint), write(" pile"),nl, %write("No hint available at this time..."),nl,
     getHumanChoiceAction(1, GameState, NewerGameState),
     NewGameState = NewerGameState.
 
@@ -694,9 +722,8 @@ getDiscardCardMove(GameState, NewGameState):-
 getDiscardAction(y, GameState, NewGameState):-  
     getRoundNumber(GameState, RoundNum),
     getHumanHand(GameState, Hand), 
-    write("Hint Recieved: "),
     getWhichCardHint(RoundNum, Hand, H),
-    write(H), nl,
+    write("You should discard >> "), write(H), write(" << because it makes your score lower"), nl,
     getDiscardAction(n, GameState, NewerGameState),
     NewGameState = NewerGameState.
 
@@ -708,7 +735,6 @@ getDiscardAction(n, GameState, NewGameState):-
     removeCardFromHand(Card, Hand, NewHand),
     getDiscardPile(GameState, Pile),
     discardToPile(Card, Pile, NewPile),
-    %NextPlayer = computer,
     GameState = [Round, CompScore, CompHand, HumanScore, _, DrawPile, _, _],
     NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, DrawPile, NewPile, computer].
 
