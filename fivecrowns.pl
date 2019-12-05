@@ -33,7 +33,6 @@ getGameFromFile(Game) :-
 newGame(_):-
     coinToss(NextPlayer),
     playGame(1, [], 0, [], 0, NextPlayer, false).
-    playGame(1, [], 0, [], 0, human, false).
     
 coinToss(NextPlayer):-
     random_between(0, 1, R),
@@ -49,19 +48,25 @@ coinToss(NextPlayer):-
 
 loadGame(Game):- 
     askIfSaveAndQuit(Choice),
-    runRound(Game, NewState,Choice).
-    %start fresh round by calling playGame.
+    runRound(Game, [CScore, HScore, StartingPlayer | _], Choice),
+    Game = [RoundNum, CompScore, _, HumanScore, _, _, _, _],
+    NewRoundNum is RoundNum + 1,
+    NewCompScore is CompScore + CScore,
+    NewHumanScore is HumanScore + HScore,
+    playGame(NewRoundNum, NewHumanScore, NewCompScore, StartingPlayer, Choice).
+
+%start fresh round by calling playGame.
 
 % save and quit
 playGame(_, _, _, _, _, _, true).
 
 % game ended
-% playGame(11, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, _):- 
+%playGame(11, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, _):- 
 %   checkIfGameEnded(HumanHand, HumanScore, CompHand, CompScore).
 
 % new game
-playGame(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, _):- 
-    generateNewRound(RoundNum, HumanHand, HumanScore, CompHand, CompScore, NextPlayer, GameState),
+playGame(RoundNum, HumanScore, CompScore, NextPlayer, _):- 
+    generateNewRound(RoundNum, HumanScore, CompScore, NextPlayer, GameState),
     loadGame(GameState).
 
 % player decides to save and quit
@@ -74,22 +79,75 @@ runRound(OldGameState, OldGameState, y):-
     write("Exiting the game..."), nl,
     halt(0).
 
-% if round ended
-% runRound(OldGameState, RoundResults, _):-
-%    OldGameState = [_, CompScore, CompHand, HumanScore, HumanHand, _, _, _],
-%    chceckIfRoundEnded(NCompScore, CompHand, NHumanScore, HumanHand),nl,
-%    write("The round has ended"), nl,
-%    CScore is CompScore + NCompScore,
-%    HScore is HumanScore + NHumanScore,
-%    RoundResults = [CScore, HScore].
+%if round ended
+runRound(OldGameState, RoundResults, last):-
+    OldGameState = [RoundNum, CompScore, CompHand, HumanScore, HumanHand, _, _, Loser],
+    write("The round has ended"), nl,
+    write(Loser), write(" lost the round."),nl,
+
+    getLowestScore(CompHand, RoundNum, [], CompAssembled, CompHandScr),
+    getLowestScore(HumanHand, RoundNum, [], HumanAssembled, HumanHandScr),
+
+    CScore is CompScore + CompHandScr,
+    HScore is HumanScore + HumanHandScr,
+
+    write("Human Hand: "), write(HumanAssembled),nl,
+    write("Computer Hand: "), write(CompAssembled),nl,
+
+    changePlayer(OldGameState, NewState),
+    getNextPlayer(NewState, StartingPlayer),
+    RoundResults = [CScore, HScore, StartingPlayer].
 
 % regular flow
 runRound(OldGameState, NewGameState, n):-
+    getNextPlayer(OldGameState, Player),
+    \+ checkIfPlayerCanGoOut(OldGameState, Player),
     displayRoundStatus(OldGameState),
     playRound(OldGameState, NewState),
+    %\+ checkIfPlayerCanGoOut(NewState, Player),
+    %write(Player), write(" cannot go out"),nl,
     askIfSaveAndQuit(Choice),
-    runRound(NewState, NewerState, Choice),
-    NewGameState = NewerState.
+    changePlayer(NewState, NewerState),
+    runRound(NewerState, NewestState, Choice),
+    NewGameState = NewestState.
+
+% when the player who just played can go out
+runRound(GameState, NewGameState, n):-
+    getNextPlayer(GameState, Player),
+    checkIfPlayerCanGoOut(GameState, Player),
+    
+    changePlayer(GameState, NewState2),
+    getNextPlayer(NewState2, CurrPlayer),
+    write(CurrPlayer), write(" has gone out."),nl,
+    
+    displayRoundStatus(GameState),
+    playRound(GameState, NewerState),
+    runRound(NewerState, NewestState, last),
+    NewGameState = NewestState.
+
+changePlayer(GameState, NewGameState):-
+    GameState = [RoundNum, CompScore, CompHand, HumanScore, HumanHand, DrawPile, DiscardPile, NextPlayer],
+    NextPlayer = human,
+    NewGameState = [RoundNum, CompScore, CompHand, HumanScore, HumanHand, DrawPile, DiscardPile, computer].
+
+changePlayer(GameState, NewGameState):-
+    GameState = [RoundNum, CompScore, CompHand, HumanScore, HumanHand, DrawPile, DiscardPile, NextPlayer],
+    NextPlayer = computer,
+    NewGameState = [RoundNum, CompScore, CompHand, HumanScore, HumanHand, DrawPile, DiscardPile, human].
+
+checkIfPlayerCanGoOut(GameState, computer):-
+    getHumanHand(GameState, Hand),
+    getRoundNumber(GameState, RoundNum),
+    getLowestScore(Hand, RoundNum, [], _, Score),
+    write("Checking going out human: "), write(Score),nl,
+    Score = 0.
+
+checkIfPlayerCanGoOut(GameState, human):-
+    getComputerHand(GameState, Hand),
+    getRoundNumber(GameState, RoundNum),
+    getLowestScore(Hand, RoundNum, [], _, Score),
+    write("Checking going out computer: "), write(Score),nl,
+    Score = 0.
 
 playRound(OldGameState, NewGameState):- 
     getNextPlayer(OldGameState, Turn),
@@ -103,7 +161,7 @@ playRound(OldGameState, NewGameState):-
     getComputerMove(OldGameState, NewState),
     NewGameState = NewState.
 
-generateNewRound(RoundNum, _, HumanScore, _, CompScore, NextPlayer, GameState):-
+generateNewRound(RoundNum, HumanScore, CompScore, NextPlayer, GameState):-
     UnshuffledDeck = ['j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk',
                         'j1', 'j2', 'j3', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 'tx', 'tj', 'tq', 'tk', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'cx', 'cj', 'cq', 'ck', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'sx', 'sj', 'sq', 'sk', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'dx', 'dj', 'dq', 'dk', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'hx', 'hj', 'hq', 'hk'],
     random_permutation(UnshuffledDeck, Deck),
@@ -176,8 +234,8 @@ computerChooseDrawPile(GameState, NewGameState):-
     removeCardFromHand(CardToDiscard, TempHand, NewHand),
     discardToPile(CardToDiscard, DiscardPile, NewDiscardPile),
 
-    GameState = [_, CompScore, _, HumanScr, HumanHand, _, _, _],
-    NewGameState = [RoundNum, CompScore, NewHand, HumanScr, HumanHand, NewDrawPile, NewDiscardPile, human].
+    GameState = [_, CompScore, _, HumanScr, HumanHand, _, _, NextPlayer],
+    NewGameState = [RoundNum, CompScore, NewHand, HumanScr, HumanHand, NewDrawPile, NewDiscardPile, NextPlayer].
 
 computerChooseDiscardPile(GameState, NewGameState):-
     getDiscardPile(GameState, DiscardPile),
@@ -234,7 +292,7 @@ getWhichPileHint(GameState, Hint):-
 
 getWhichPileToChoose([], _, _, _, draw).
 getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
-    [First | Rest] = ListHands,
+    [First | _] = ListHands,
     getLowestScore(First, RoundNum, [], Assembled1, Score1),
     length(Assembled1, AssembledLen1),
     Score1 < Score,
@@ -735,8 +793,8 @@ getDiscardAction(n, GameState, NewGameState):-
     removeCardFromHand(Card, Hand, NewHand),
     getDiscardPile(GameState, Pile),
     discardToPile(Card, Pile, NewPile),
-    GameState = [Round, CompScore, CompHand, HumanScore, _, DrawPile, _, _],
-    NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, DrawPile, NewPile, computer].
+    GameState = [Round, CompScore, CompHand, HumanScore, _, DrawPile, _, NextPlayer],
+    NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, DrawPile, NewPile, NextPlayer].
 
 getDiscardAction(n, GameState, NewGameState):-
     getDiscardAction(n, GameState, NewerGameState),
@@ -768,9 +826,7 @@ addPileCardToHand(2, GameState, NewGameState):-
     getDiscardPile(GameState, Pile),
     popTopCard(Pile, NewPile, TopCard),
     getHumanHand(GameState, Hand),
-    %write("adding.."), write(Hand), nl,
     [TopCard | Hand] = NewHand,
-    %write("added: "), write(NewHand), nl,
     GameState = [Round, CompScore, CompHand, HumanScore, _, DrawPile, _, NextPlayer],
     NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, DrawPile, NewPile, NextPlayer].
     
