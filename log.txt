@@ -36,5 +36,12 @@ Total Hours: 3.
 
 12/3/2019:
 - added getWhichCardToDiscard hint.
+- added feature where jokers and wild cards are not suggested to discard.
 Total Hours: 1.
 
+12/4/2019:
+- Infinite loop when asked hint for which card to discard.
+- Fixed: was calling getLowestScore unnecessarily.
+Total Hours: 5.
+
+12/5/2019:
