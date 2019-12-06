@@ -58,26 +58,26 @@ loadGame(Game):-
 %start fresh round by calling playGame.
 
 % save and quit
-playGame(_, _, _, _, _, _, true).
+playGame(_, _, _, _, true).
 
 % game ended
-playGame(12, _, HumanScore, _, CompScore, _, _):- 
+playGame(12, HumanScore, CompScore, _, _):- 
     write("**********************************GAME OVER**********************************"),nl,
     getWinner(HumanScore, CompScore, Winner, Loser, WinnerScore, LoserScore),
     write(Winner), write(" is the winner!"),nl,
     write(Winner), write(" Score: "), write(WinnerScore),nl,
     write(Loser), write(" Score: "), write(LoserScore),nl.
 
-getWinner(HumanScore, CompScore, human, computer, HumanScore, CompScore):-
-    HumanScore > CompScore.
-
-getWinner(HumanScore, CompScore, computer, human, CompScore, HumanScore):-
-    CompScore > HumanScore.
-
 % new game
 playGame(RoundNum, HumanScore, CompScore, NextPlayer, _):- 
     generateNewRound(RoundNum, HumanScore, CompScore, NextPlayer, GameState),
     loadGame(GameState).
+
+getWinner(HumanScore, CompScore, human, computer, HumanScore, CompScore):-
+    HumanScore < CompScore.
+
+getWinner(HumanScore, CompScore, computer, human, CompScore, HumanScore):-
+    CompScore < HumanScore.
 
 % player decides to save and quit
 runRound(OldGameState, OldGameState, y):-
@@ -217,16 +217,16 @@ discardToPile(Card, DiscardPile, NewDiscardPile):-
 
 getComputerMove(GameState, NewGameState):-
     getWhichPileHint(GameState, Hint),
-    Hint = draw,
-    write("Computer chose >> draw pile << to pick the card because discard pile did not help in making more runs or books"),nl,
-    computerChooseDrawPile(GameState, NewState),
+    Hint = discard,
+    write("Computer chose >> discard pile << to pick the card because it helped in making more runs or books."),nl,
+    computerChooseDiscardPile(GameState, NewState),
     NewGameState = NewState.
 
 getComputerMove(GameState, NewGameState):-
     getWhichPileHint(GameState, Hint),
-    Hint = discard,
-    write("Computer chose >> discard pile << to pick the card because it helped in making more runs or books."),nl,
-    computerChooseDiscardPile(GameState, NewState),
+    Hint = draw,
+    write("Computer chose >> draw pile << to pick the card because discard pile did not help in making more runs or books"),nl,
+    computerChooseDrawPile(GameState, NewState),
     NewGameState = NewState.
 
 computerChooseDrawPile(GameState, NewGameState):-
@@ -270,7 +270,7 @@ getWhichPileHint(GameState, Hint):-
     getRoundNumber(GameState, RoundNum),
     getHumanHand(GameState, Hand),
     getLowestScore(Hand, RoundNum, [], CurrAssembled, CurrScore),
-    length(CurrAssembled, CurrAssembledLen),
+    %length(CurrAssembled, CurrAssembledLen),
     
     getDiscardPile(GameState, DiscardPile),
     popTopCard(DiscardPile, _, TopCard),
@@ -279,7 +279,7 @@ getWhichPileHint(GameState, Hint):-
     getListOfEachElementRemoved(NewHand, NewHand, ListHands),
     [_ | WithDCard] = ListHands,
 
-    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
+    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembled, Pile),
     Hint = Pile.
 
 getWhichPileHint(GameState, Hint):-
@@ -288,7 +288,7 @@ getWhichPileHint(GameState, Hint):-
     getRoundNumber(GameState, RoundNum),
     getComputerHand(GameState, Hand),
     getLowestScore(Hand, RoundNum, [], CurrAssembled, CurrScore),
-    length(CurrAssembled, CurrAssembledLen),
+    %length(CurrAssembled, CurrAssembledLen),
 
     getDiscardPile(GameState, DiscardPile),
     popTopCard(DiscardPile, _, TopCard),
@@ -297,31 +297,38 @@ getWhichPileHint(GameState, Hint):-
     getListOfEachElementRemoved(NewHand, NewHand, ListHands),
     [_ | WithDCard] = ListHands,
 
-    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembledLen, Pile),
+    getWhichPileToChoose(WithDCard, RoundNum, CurrScore, CurrAssembled, Pile),
     Hint = Pile.
 
 getWhichPileToChoose([], _, _, _, draw).
-getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
+getWhichPileToChoose(ListHands, RoundNum, Score, Assembled, Pile):-
     [First | _] = ListHands,
     getLowestScore(First, RoundNum, [], Assembled1, Score1),
-    length(Assembled1, AssembledLen1),
+    %length(Assembled1, AssembledLen1),
     Score1 < Score,
-    AssembledLen1 > AssembledLen,
+    %AssembledLen1 > AssembledLen, % maybe use has larger hand with books and runs
+    hasAddedToBooksOrRuns(Assembled, Score, Assembled1, Score1),
     Pile = discard.
 
-getWhichPileToChoose(ListHands, RoundNum, Score, AssembledLen, Pile):-
+getWhichPileToChoose(ListHands, RoundNum, Score, Assembled, Pile):-
     [_ | Rest] = ListHands,
-    getWhichPileToChoose(Rest, RoundNum, Score, AssembledLen, NewPile),
+    getWhichPileToChoose(Rest, RoundNum, Score, Assembled, NewPile),
     Pile = NewPile.
 
-removeEachCardAndCheck(Hand, RoundNum, Score):-
-    [Card | PrevHand] = Hand,
-    getListOfEachElementRemoved(PrevHand, PrevHand, RemHand),
-    addAtomToEachInList(Card, RemHand, NewHandList),
-    checkWhichHandHasLowerScore(NewHandList, RoundNum, Score, LowHand),
-    length(LowHand, Len),
-    Len = 1.
+hasAddedToBooksOrRuns(_, _, _, 0).
 
+hasAddedToBooksOrRuns(PrevAssembled, _, CurrAssembled, _):-
+    getLastElement(PrevAssembled, PrevLast),
+    getLastElement(CurrAssembled, CurrLast),
+    length(PrevLast, PrevLen),
+    length(CurrLast, CurrLen),
+    CurrLen < PrevLen,
+    write(CurrLast), write(" <> "), write(PrevLast),nl.
+
+getLastElement([Last], Last).
+getLastElement([_|Rest], Last):-
+    getLastElement(Rest, NewLast),
+    Last = NewLast.
 %TODO need to check this
 checkWhichHandHasLowerScore([], _, _, []).
 
@@ -737,7 +744,13 @@ getHumanChoiceAction(1, GameState, NewGameState):-
 
 getHumanChoiceAction(2, GameState, NewGameState):-
     getWhichPileHint(GameState, Hint),
+    Hint = discard,
     write("You should pick from >> "), write(Hint), write(" pile << because it helps you to make more runs or books."),nl,
+    getHumanChoiceAction(1, GameState, NewerGameState),
+    NewGameState = NewerGameState.
+
+getHumanChoiceAction(2, GameState, NewGameState):-
+    write("You should pick from >> draw pile << because discard pile did not help in making more runs or books."),nl,
     getHumanChoiceAction(1, GameState, NewerGameState),
     NewGameState = NewerGameState.
 
@@ -790,21 +803,15 @@ askToAssembleHand(Hand, RoundNum):-
     Answer = y,
     getLowestScore(Hand, RoundNum, [], Assembled, Score),
     write("Hand: "), write(Assembled), nl,
-    write("Score: "), write(Score),nl.
+    write("Score: "), write(Score), nl.
 
-askToAssembleHand(_, _):-
-    askAssembleQuestion(Answer),
-    Answer = n.
+askToAssembleHand(_, _).
 
 askAssembleQuestion(Answer):-
     write("Would you like to assemble your possible books and runs? (y/n)"), nl,
     read(Choice),
     validateYesNoChoice(Choice),
     Answer = Choice.
-
-askAssembleQuestion(Answer):-
-    askAssembleQuestion(NewAns),
-    Answer = NewAns.
 
 addPileCardToHand(1, GameState, NewGameState):-
     getNextPlayer(GameState, Player),

@@ -1,0 +1,1 @@
+[3,6,[t3,c6,d6,c5,c9],0,[t8,j3,cx,tk,c5],[t7,d4,cq,h6,hq,dx,sq,h9,ck,c7,h8,d9,s9,s3,c6,hq,s4,d3,h4,dq,h8,s8,sk,h9,t9,dx,sj,j2,dk,s7,s6,tj,hj,tx,d8,ck,t4,tx,hj,s4,sj,j1,c3,hk,c8,hx,j3,tj,c7,h7,h3,hx,d6,c8,sk,c4,s7,tq,d5,d4,d5,h3,s8,d8,tq,dq,s6,t6,h7,s9,cj,d9,cq,dj,hk,d7,c3,s5,h5,j2,cj,t6,cx,t4,d3,j1,sx,t3,t5,s3,h6,t8,dj,dk,h4,t7,sq,d7,h5,tk,c4,t5,sx,s5,t9],[c9],human].
