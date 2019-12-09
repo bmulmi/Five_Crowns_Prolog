@@ -32,7 +32,7 @@ getGameFromFile(Game) :-
 
 newGame(_):-
     coinToss(NextPlayer),
-    playGame(1, [], 0, [], 0, NextPlayer, false).
+    playGame(1, 0, 0, NextPlayer, false).
     
 coinToss(NextPlayer):-
     random_between(0, 1, R),
@@ -54,8 +54,6 @@ loadGame(Game):-
     NewCompScore is CompScore + CScore,
     NewHumanScore is HumanScore + HScore,
     playGame(NewRoundNum, NewHumanScore, NewCompScore, StartingPlayer, Choice).
-
-%start fresh round by calling playGame.
 
 % save and quit
 playGame(_, _, _, _, true).
@@ -89,7 +87,7 @@ runRound(OldGameState, OldGameState, y):-
     write("Exiting the game..."), nl,
     halt(0).
 
-%if round ended
+% round ended
 runRound(OldGameState, RoundResults, last):-
     OldGameState = [RoundNum, _, CompHand, _, HumanHand, _, _, Loser],
     write("The round has ended"), nl,
@@ -149,14 +147,12 @@ checkIfPlayerCanGoOut(GameState, computer):-
     getHumanHand(GameState, Hand),
     getRoundNumber(GameState, RoundNum),
     getLowestScore(Hand, RoundNum, [], _, Score),
-    %write("Checking going out human: "), write(Score),nl,
     Score = 0.
 
 checkIfPlayerCanGoOut(GameState, human):-
     getComputerHand(GameState, Hand),
     getRoundNumber(GameState, RoundNum),
     getLowestScore(Hand, RoundNum, [], _, Score),
-    %write("Checking going out computer: "), write(Score),nl,
     Score = 0.
 
 playRound(OldGameState, NewGameState):- 
@@ -323,30 +319,12 @@ hasAddedToBooksOrRuns(PrevAssembled, _, CurrAssembled, _):-
     length(PrevLast, PrevLen),
     length(CurrLast, CurrLen),
     CurrLen < PrevLen,
-    write(CurrLast), write(" <> "), write(PrevLast),nl.
+    write(PrevLast), write(" <to> "), write(CurrLast),nl.
 
 getLastElement([Last], Last).
 getLastElement([_|Rest], Last):-
     getLastElement(Rest, NewLast),
     Last = NewLast.
-%TODO need to check this
-checkWhichHandHasLowerScore([], _, _, []).
-
-checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
-    [First | Rest] = HandList,
-    getLowestScore(First, RoundNum, [], _, Scr),
-    checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
-    Scr < Score,
-    LowHand = First.
-
-checkWhichHandHasLowerScore(HandList, RoundNum, Score, LowHand):-
-    [First | Rest] = HandList,
-    getLowestScore(First, RoundNum, [], _, Scr),
-    checkWhichHandHasLowerScore(Rest, RoundNum, Score, _),
-    Scr >= Score,
-    LowHand = [].
-
-%end which pile to choose hint
 
 %begin which card to discard
 getWhichCardHint(RoundNum, Hand, Hint):-
@@ -774,6 +752,11 @@ getDiscardCardMove(GameState, NewGameState):-
     getDiscardAction(Choice, GameState, NewerGameState),
     NewGameState = NewerGameState.
 
+getDiscardCardMove(GameState, NewGameState):-
+    write("INVALID CHOICE. Please enter y for yes, n for no. "), nl,
+    getDiscardCardMove(GameState, NewState),
+    NewGameState = NewState.
+
 getDiscardAction(y, GameState, NewGameState):-  
     getRoundNumber(GameState, RoundNum),
     getHumanHand(GameState, Hand), 
@@ -787,6 +770,7 @@ getDiscardAction(n, GameState, NewGameState):-
     getHumanHand(GameState, Hand),
     write(Hand),nl,
     read(Card),
+    member(Card, Hand),
     removeCardFromHand(Card, Hand, NewHand),
     getDiscardPile(GameState, Pile),
     discardToPile(Card, Pile, NewPile),
@@ -795,6 +779,7 @@ getDiscardAction(n, GameState, NewGameState):-
     NewGameState = [Round, CompScore, CompHand, HumanScore, NewHand, DrawPile, NewPile, NextPlayer].
 
 getDiscardAction(n, GameState, NewGameState):-
+    write("INVALID CARD ENTERED! Please enter the correct card."), nl,
     getDiscardAction(n, GameState, NewerGameState),
     NewGameState = NewerGameState.
 
@@ -812,6 +797,11 @@ askAssembleQuestion(Answer):-
     read(Choice),
     validateYesNoChoice(Choice),
     Answer = Choice.
+
+askAssembleQuestion(Answer):-
+    write("INVALID CHOICE! Please enter y for yes, n for no."), nl,
+    askAssembleQuestion(NewAnswer),
+    Answer = NewAnswer.
 
 addPileCardToHand(1, GameState, NewGameState):-
     getNextPlayer(GameState, Player),
@@ -852,6 +842,11 @@ addPileCardToHand(2, GameState, NewGameState):-
     [TopCard | Hand] = NewHand,
     GameState = [Round, CompScore, _, HumanScore, HumanHand, DrawPile, _, NextPlayer],
     NewGameState = [Round, CompScore, NewHand, HumanScore, HumanHand, DrawPile, NewPile, NextPlayer].
+
+addPileCardToHand(_, GameState, NewGameState):-
+    write("INVALID CHOICE! Please enter 1 for Draw Pile, 2 for Discard Pile."), nl,
+    getChosenPileMove(GameState, NewState),
+    NewGameState = NewState.
 
 removeCardCollectionFromHand([], [], []).
 removeCardCollectionFromHand(_, [], []).

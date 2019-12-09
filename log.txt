@@ -45,3 +45,10 @@ Total Hours: 1.
 Total Hours: 5.
 
 12/5/2019:
+- added playGame with condition for ending the entire game.
+- added runRound with condition for ending the round and starting a fresh one.
+Total Hours: 3.
+
+12/9/2019:
+- debugged and tested the game. Works flawlessly.
+Total Hours: 1.
